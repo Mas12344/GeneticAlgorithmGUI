@@ -58,6 +58,7 @@ int GeneticAlgorithm::Run(bool timeLimit){
     auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(isEnd - start).count();
     
     for(int gen = 0; gen < m_MaxGenNumber; gen++){
+        Progress = (float)gen / m_MaxGenNumber;
         if(timeLimit){
             duration = std::chrono::duration_cast<std::chrono::milliseconds>(isEnd - start).count();
             if( duration > 5LL*60*1000){
@@ -109,4 +110,19 @@ void GeneticAlgorithm::PrintBestChromosome(){
     std::cout << "Best ";
     m_BestChromosome.PrintGenes();
     std::cout << std::endl;
+}
+
+void GeneticAlgorithm::RunInAnotherThread(bool timeLimit)
+{
+    m_Value = std::async(&GeneticAlgorithm::Run, this, timeLimit);
+}
+
+std::optional<int> GeneticAlgorithm::GetValue()
+{
+    using namespace std::chrono_literals;
+    std::optional<int> val;
+    if (m_Value.wait_for(1ms) == std::future_status::ready) {
+        val = m_Value.get();
+    }
+    return val;
 }

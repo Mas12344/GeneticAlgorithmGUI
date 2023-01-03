@@ -8,9 +8,55 @@
 #include <imgui.h>
 #include <imgui_impl_glfw.h>
 #include <imgui_impl_opengl3.h>
+#include <imgui_internal.h>
 
 #include <GLFW/glfw3.h>
 
+namespace ImGui {
+    bool BufferingBar(const char* label, float value, const ImVec2& size_arg, const ImU32& bg_col, const ImU32& fg_col) {
+        ImGuiWindow* window = GetCurrentWindow();
+        if (window->SkipItems)
+            return false;
+
+        ImGuiContext& g = *GImGui;
+        const ImGuiStyle& style = g.Style;
+        const ImGuiID id = window->GetID(label);
+
+        ImVec2 pos = window->DC.CursorPos;
+        ImVec2 size = size_arg;
+        size.x -= style.FramePadding.x * 2;
+
+        const ImRect bb(pos, ImVec2(pos.x + size.x, pos.y + size.y));
+        ItemSize(bb, style.FramePadding.y);
+        if (!ItemAdd(bb, id))
+            return false;
+
+        // Render
+        const float circleStart = size.x * 0.7f;
+        const float circleEnd = size.x;
+        const float circleWidth = circleEnd - circleStart;
+
+        window->DrawList->AddRectFilled(bb.Min, ImVec2(pos.x + circleStart, bb.Max.y), bg_col);
+        window->DrawList->AddRectFilled(bb.Min, ImVec2(pos.x + circleStart * value, bb.Max.y), fg_col);
+
+        const float t = g.Time;
+        const float r = size.y / 2;
+        const float speed = 1.5f;
+
+        const float a = speed * 0;
+        const float b = speed * 0.333f;
+        const float c = speed * 0.666f;
+
+        const float o1 = (circleWidth + r) * (t + a - speed * (int)((t + a) / speed)) / speed;
+        const float o2 = (circleWidth + r) * (t + b - speed * (int)((t + b) / speed)) / speed;
+        const float o3 = (circleWidth + r) * (t + c - speed * (int)((t + c) / speed)) / speed;
+
+        window->DrawList->AddCircleFilled(ImVec2(pos.x + circleEnd - o1, bb.Min.y + r), r, bg_col);
+        window->DrawList->AddCircleFilled(ImVec2(pos.x + circleEnd - o2, bb.Min.y + r), r, bg_col);
+        window->DrawList->AddCircleFilled(ImVec2(pos.x + circleEnd - o3, bb.Min.y + r), r, bg_col);
+    }
+
+}
 
 int greedy_algorithm(const Instance& inst){
     std::vector<int> processors;
@@ -39,6 +85,8 @@ int greedy_algorithm(const Instance& inst){
     return biggest;
 }
 
+
+#pragma comment(linker, "/SUBSYSTEM:windows /ENTRY:mainCRTStartup")
 int main() {
     //setup window
     if (!glfwInit())
@@ -78,8 +126,29 @@ int main() {
     ImGui_ImplGlfw_InitForOpenGL(window, true);
     ImGui_ImplOpenGL3_Init("#version 130");
 
-    bool show_demo = true;
+    const std::vector<std::string> instance_files = {
+        "instancje/m25.txt",
+        "instancje/m50.txt",
+        "instancje/m50n200.txt",
+        "instancje/m50n1000.txt",
+        "instancje/m10n200.txt",
+        "instancje/m30.txt",
+    };
+
+
+    bool show_demo = false;
     ImVec4 clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
+    std::string instance_choice;
+    int greedy_value = 0;
+    int genetic_value = 0;
+    std::unique_ptr<Instance> p_instance;
+    std::unique_ptr<GeneticAlgorithm> p_GeneticAlgorith;
+    int populationSize = 250;
+    float crossoverProb = 0.3;
+    float mutationProb = 0.15;
+    int maxGenNumber = 10000;
+    bool timeLimit = true;
+    bool hasRan = false;
 
     while (!glfwWindowShouldClose(window)) {
         glfwPollEvents();
@@ -90,6 +159,77 @@ int main() {
 
         if (show_demo)
             ImGui::ShowDemoWindow(&show_demo);
+
+        //DOCKSPACE
+        {
+            auto vp = ImGui::GetMainViewport();
+            ImGui::SetNextWindowPos(vp->Pos);
+            ImGui::SetNextWindowSize(vp->Size);
+            ImGui::SetNextWindowViewport(vp->ID);
+            ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 0.0f);
+            ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.0f);
+            ImGui::Begin("DockSpace", nullptr, ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoBringToFrontOnFocus | ImGuiWindowFlags_NoNavFocus);
+            ImGui::DockSpace(ImGui::GetID("Main"), ImVec2(0.0f, 0.0f), ImGuiDockNodeFlags_PassthruCentralNode);
+            ImGui::PopStyleVar(2);
+            ImGui::End();
+        }
+        {
+            ImGui::Begin("Wybor instancji");
+            if(ImGui::BeginCombo("##instancje", instance_choice.c_str())){
+                for(auto& instance_file : instance_files){
+                    if (ImGui::Selectable(instance_file.c_str())) {
+                        instance_choice = instance_file;
+                        p_instance = std::make_unique<Instance>(instance_choice);
+                    }
+                }
+                ImGui::EndCombo();
+            }
+            ImGui::End();
+        }
+        {
+            ImGui::Begin("Algorytm zachlanny");
+            ImGui::Text("Wynik: ");
+            ImGui::InputInt("##greedy", &greedy_value, 0, 0);
+            if (ImGui::Button("Start")) {
+                if (p_instance != nullptr) {
+                    greedy_value = greedy_algorithm(*p_instance);
+                }
+            }
+            ImGui::End();
+        }
+        {
+            ImGui::Begin("Algorytm Genetyczny");
+            ImGui::Text("Wynik: ");
+            ImGui::InputInt("##genetic", &genetic_value, 0, 0);
+            if (ImGui::Button("Start") && instance_choice != "") {
+                p_GeneticAlgorith = std::make_unique<GeneticAlgorithm>(instance_choice, populationSize, crossoverProb, mutationProb, maxGenNumber);
+                p_GeneticAlgorith->RunInAnotherThread(timeLimit);
+                hasRan = true;
+            }
+            if (hasRan) {
+                auto opt_int = p_GeneticAlgorith->GetValue();
+                if (opt_int.has_value()) {
+                    genetic_value = opt_int.value();
+                    hasRan = false;
+                }
+            }
+            
+            if (hasRan) {
+                ImGui::BufferingBar("##progress", p_GeneticAlgorith->Progress, { ImGui::GetCurrentWindow()->ContentSize.x, 10 }, 0xFF313131, 0xFF1818FF);
+            }
+            ImGui::End();
+        }
+        {
+            ImGui::Begin("Ustawienia");
+            ImGui::Checkbox("Limit czasowy", &timeLimit);
+            ImGui::InputInt("Rozmiar populacji", &populationSize, 2);
+            ImGui::DragFloat("Proporcja crossoveru", &crossoverProb, 0.05, 0.05, 0.95);
+            ImGui::DragFloat("Szansa mutacji", &mutationProb, 0.01, 0.010, 1.0);
+            ImGui::DragInt("Ilosc generacji", &maxGenNumber, 100, 100, 100000);
+            ImGui::End();
+        }
+            
+       
 
         ImGui::Render();
         int display_w, display_h;
@@ -120,27 +260,6 @@ int main() {
     return 0;
 
 
-
-    std::vector<std::string> instances_files = {
-        "instancje/m25.txt",
-        "instancje/m50.txt",
-        "instancje/m50n200.txt",
-        "instancje/m50n1000.txt",
-        "instancje/m10n200.txt",
-        "instancje/m30.txt",
-        };
-
-    for(auto& instance_file:instances_files){
-        std::cout << instance_file << std::endl;
-        Instance inst = Instance(instance_file);
-        std::cout << "greedy: " << greedy_algorithm(inst) << std::endl;
-        
-        GeneticAlgorithm GA = GeneticAlgorithm(instance_file, 250, 0.3, 0.15, 100000);
-        int wynik =  GA.Run(true);
-        std::cout << "genetic algorithm: " << wynik << std::endl << std::endl;
-    };
-    
-    return 0;
 }
 
 
