@@ -16,6 +16,8 @@ public:
     void RunInAnotherThread(bool timeLimit);
     std::optional<int> GetValue();
     float Progress = 0.0f;
+    std::vector<int> HistoricalBest;
+    inline int GetMinimalTime() { return m_Instance.GetTotalTime() / m_Instance.GetProcessorCount(); };
 private:
     std::vector<Chromosome> m_CurrentGeneration;
     int m_PopulationSize;

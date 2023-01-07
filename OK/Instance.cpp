@@ -4,9 +4,10 @@
 #include <iostream>
 #include <cassert>
 #include <random>
+#include <numeric>
 
 Instance::Instance(const std::string& filepath)
-    : m_ProcessorsCount(0), m_TasksCount(0)
+    : m_ProcessorsCount(0), m_TasksCount(0), m_TotalTime(0)
 {
     std::ifstream data(filepath);
     std::stringstream ss;
@@ -18,7 +19,9 @@ Instance::Instance(const std::string& filepath)
     m_TasksCount = std::stoi(line);
 
     while(std::getline(ss, line, '\n')){
-        m_Tasks.push_back(std::stoi(line));
+        auto val = std::stoi(line);
+        m_Tasks.push_back(val);
+        m_TotalTime += val;
     }
     
     assert(m_TasksCount == m_Tasks.size() && "nieoczekiwana liczba zadan");
@@ -40,8 +43,9 @@ Instance Instance::GenRandomInstance(int processors, int taskCount){
 }
 
 Instance::Instance(int processors, int taskCount, std::vector<int> tasks)
-    : m_ProcessorsCount(processors), m_TasksCount(taskCount), m_Tasks(tasks)
+    : m_ProcessorsCount(processors), m_TasksCount(taskCount), m_Tasks(tasks), m_TotalTime(0)
 {
+    m_TotalTime = std::accumulate(tasks.begin(), tasks.end(), 0);
 }
 
 void Instance::SaveToFile(const std::string& filepath){

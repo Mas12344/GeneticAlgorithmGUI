@@ -10,6 +10,8 @@
 #include <imgui_impl_opengl3.h>
 #include <imgui_internal.h>
 
+#include <implot.h>
+
 #include <GLFW/glfw3.h>
 
 namespace ImGui {
@@ -110,6 +112,7 @@ int main() {
     //setup imgui
     IMGUI_CHECKVERSION();
     ImGui::CreateContext();
+    ImPlot::CreateContext();
     ImGuiIO& io = ImGui::GetIO();
     io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
     io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
@@ -180,6 +183,8 @@ int main() {
                     if (ImGui::Selectable(instance_file.c_str())) {
                         instance_choice = instance_file;
                         p_instance = std::make_unique<Instance>(instance_choice);
+                        greedy_value = 0;
+                        genetic_value = 0;
                     }
                 }
                 ImGui::EndCombo();
@@ -189,7 +194,7 @@ int main() {
         {
             ImGui::Begin("Algorytm zachlanny");
             ImGui::Text("Wynik: ");
-            ImGui::InputInt("##greedy", &greedy_value, 0, 0);
+            ImGui::InputInt("##greedy", &greedy_value, 0, 0, ImGuiInputTextFlags_ReadOnly);
             if (ImGui::Button("Start")) {
                 if (p_instance != nullptr) {
                     greedy_value = greedy_algorithm(*p_instance);
@@ -200,7 +205,7 @@ int main() {
         {
             ImGui::Begin("Algorytm Genetyczny");
             ImGui::Text("Wynik: ");
-            ImGui::InputInt("##genetic", &genetic_value, 0, 0);
+            ImGui::InputInt("##genetic", &genetic_value, 0, 0, ImGuiInputTextFlags_ReadOnly);
             if (ImGui::Button("Start") && instance_choice != "") {
                 p_GeneticAlgorith = std::make_unique<GeneticAlgorithm>(instance_choice, populationSize, crossoverProb, mutationProb, maxGenNumber);
                 p_GeneticAlgorith->RunInAnotherThread(timeLimit);
@@ -228,9 +233,22 @@ int main() {
             ImGui::DragInt("Ilosc generacji", &maxGenNumber, 100, 100, 100000);
             ImGui::End();
         }
+        {
+            ImGui::Begin("Wykres");
+            if (p_GeneticAlgorith != nullptr) {
+                if (ImPlot::BeginPlot("Fitness")) {
+                    static ImPlotAxisFlags yflags = ImPlotAxisFlags_AutoFit | ImPlotAxisFlags_RangeFit;
+                    static ImPlotAxisFlags xflags = ImPlotAxisFlags_AutoFit;
+                    ImPlot::SetupAxes("Generacja", "Fitness", xflags, yflags);
+                    ImPlot::PlotLine("##line", p_GeneticAlgorith->HistoricalBest.data(), p_GeneticAlgorith->HistoricalBest.size());
+
+                    ImPlot::EndPlot();
+                }
+            }
+            ImGui::End();
+        }
             
        
-
         ImGui::Render();
         int display_w, display_h;
         glfwGetFramebufferSize(window, &display_w, &display_h);
@@ -253,6 +271,7 @@ int main() {
     ImGui_ImplOpenGL3_Shutdown();
     ImGui_ImplGlfw_Shutdown();
     ImGui::DestroyContext();
+    ImPlot::DestroyContext();
 
     glfwDestroyWindow(window);
     glfwTerminate();

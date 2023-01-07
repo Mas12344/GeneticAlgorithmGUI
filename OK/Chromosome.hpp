@@ -20,6 +20,7 @@ public:
 	void PrintGenes();
 	bool operator < (const Chromosome& rhs);
 	inline unsigned long GetHash() { return m_Hash;	}
+	inline int GetCashedFitness() { return m_CachedFitness; }
 private:
 	unsigned long m_Hash;
 	int m_CachedFitness;

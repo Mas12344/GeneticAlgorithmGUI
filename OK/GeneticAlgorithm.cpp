@@ -20,7 +20,8 @@ GeneticAlgorithm::GeneticAlgorithm(
         m_CrossoverProb(crossoverProb),
         m_MutationProb(mutationProb), m_MaxGenNumber(maxGenNumber),
         m_BestChromosome(Chromosome(m_Instance, Chromosome::GenRandomChromosome(m_Instance.GetTasksCount()))),
-        m_BestChromosomeGenIndex(0)
+        m_BestChromosomeGenIndex(0),
+        HistoricalBest()
 {
     for(int i = 0; i < m_PopulationSize; i++){
        m_CurrentGeneration.push_back(Chromosome(m_Instance, Chromosome::GenRandomChromosome(m_Instance.GetTasksCount())));
@@ -56,6 +57,7 @@ int GeneticAlgorithm::Run(bool timeLimit){
     auto start = std::chrono::steady_clock::now();
     std::chrono::steady_clock::time_point isEnd;
     auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(isEnd - start).count();
+    HistoricalBest.clear();
     
     for(int gen = 0; gen < m_MaxGenNumber; gen++){
         Progress = (float)gen / m_MaxGenNumber;
@@ -96,13 +98,14 @@ int GeneticAlgorithm::Run(bool timeLimit){
             
         }
         RemoveDuplicates();
+        HistoricalBest.push_back(m_CurrentGeneration[0].GetCashedFitness());
 
     }
 #ifndef NO_PRINT
     std::cout << std::endl << "Duration : " << duration / (60.0 * 1000.0)  << " minutes" << std::endl << "Gen index of best score: " << m_BestChromosomeGenIndex << std::endl;
 #endif
     std::sort(m_CurrentGeneration.begin(), m_CurrentGeneration.end());
-    m_BestChromosome = m_CurrentGeneration[0].CalculateFitness() < m_BestChromosome.CalculateFitness() ? m_CurrentGeneration[0] : m_BestChromosome;
+    m_BestChromosome = m_CurrentGeneration[0].GetCashedFitness() < m_BestChromosome.GetCashedFitness() ? m_CurrentGeneration[0] : m_BestChromosome;
     return m_BestChromosome.CalculateFitness();
 }
 
