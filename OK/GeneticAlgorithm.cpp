@@ -97,8 +97,8 @@ int GeneticAlgorithm::Run(bool timeLimit){
             }   
             
         }
-        RemoveDuplicates();
         HistoricalBest.push_back(m_CurrentGeneration[0].GetCashedFitness());
+        RemoveDuplicates();
 
     }
 #ifndef NO_PRINT
